@@ -72,7 +72,8 @@ class DB
         $sth->execute(['product_id' => $response['product_id']]);
         $stock = $sth->fetch(\PDO::FETCH_ASSOC);
 
-        $price = round($stock['sum'] / $stock['quantity'], 2) * 100;
+        $price = round($stock['sum'] / $stock['quantity']
+            + $stock['sum'] / $stock['quantity'] * 0.3, 2) * 100;
 
         if ($sendingQuantity > $stock['quantity']) {
             $date = new \DateTime($date);
