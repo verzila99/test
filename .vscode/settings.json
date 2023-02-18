@@ -7,5 +7,7 @@
             "name": "sqllite test",
             "database": "${workspaceFolder:test}/database.sql"
         }
-    ]
+    ],
+    "cSpell.words": ["sendings"],
+    "php.stubs": ["*", "xdebug"]
 }
