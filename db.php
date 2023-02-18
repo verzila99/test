@@ -120,7 +120,7 @@ class DB
 
             return $response;
         }
-        $this->dbh->exec("TRUNCATE `stock`");
+        $this->dbh->exec("DELETE FROM `stock` WHERE `product_id`=3");
         $this->dbh->exec("TRUNCATE `sendings`");
 
         $beginDate = new \DateTime($this->startDateOfSending);
