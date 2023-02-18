@@ -51,7 +51,7 @@ class DB
             return $response;
         }
 
-        $stmt = $this->dbh->prepare("INSERT INTO `stock` SET `product_id` = :product_id,`quantity` =`quantity`+ :quantity  ,`sum` =  (`sum` + :sum) / 2   ON DUPLICATE KEY UPDATE
+        $stmt = $this->dbh->prepare("INSERT INTO `stock` SET `product_id` = :product_id,`quantity` =:quantity  ,`sum` = :sum    ON DUPLICATE KEY UPDATE
             `product_id` = :product_id,`quantity` =`quantity`+ :quantity ,`sum` = (`sum` + :sum) / 2");
 
         $stmt->execute(
