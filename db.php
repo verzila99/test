@@ -20,12 +20,16 @@ class DB
     {
 
         if ($currentLevel === 2) {
+
             $result = [1, 1];
+
         } elseif ($currentLevel > 2) {
+
             array_push($result, $result[count($result) - 2] + $result[count($result) - 1]);
         }
 
         if ($currentLevel >= $maxLevel) {
+
             return $result;
         }
         $currentLevel++;
@@ -33,61 +37,81 @@ class DB
         return self::fibonacci($maxLevel, $currentLevel, $result);
 
     }
-    public function countProducts(string $date, array $response): array|bool
+    public function countProducts(string $date, array $response): array
     {
 
-        $sth = $this->dbh->prepare("SELECT `product_id`,products.name as name , SUM(`quantity`) as quantity ,SUM(`sum`) as sum FROM `deliveries` LEFT JOIN `products` ON deliveries.product_id = products.id WHERE `date` < :date GROUP BY `product_id`;");
+        $sth = $this->dbh->prepare("SELECT * FROM `deliveries` WHERE `date` = :date AND `product_id`=:product_id;");
 
-        $sth->execute(array('date' => $date));
+        $sth->execute(['date' => $date, 'product_id' => $response['product_id']]);
 
-        $array = $sth->fetchAll(\PDO::FETCH_ASSOC);
+        $result = $sth->fetch(\PDO::FETCH_ASSOC);
 
-        if (!$array) {
-
-            $response['errors'][] = 'Не верная дата';
+        if (!$result) {
 
             return $response;
         }
 
-        foreach ($array as $key => $value) {
+        $stmt = $this->dbh->prepare("INSERT INTO `stock` SET `product_id` = :product_id,`quantity` =`quantity`+ :quantity  ,`sum` =  (`sum` + :sum) / 2   ON DUPLICATE KEY UPDATE
+            `product_id` = :product_id,`quantity` =`quantity`+ :quantity ,`sum` = (`sum` + :sum) / 2");
 
-            $stmt = $this->dbh->prepare("UPDATE `stock` SET `quantity` = :quantity ,`sum` = :sum  WHERE `product_id` = :product_id");
+        $stmt->execute(
+            [
+                'quantity' => $result['quantity'],
+                'sum' => $result['sum'],
+                'product_id' => $result['product_id']
+            ]
+        );
 
-            $stmt->execute(array('quantity' => $value['quantity'], 'sum' => $value['sum'], 'product_id' => $value['product_id']));
-        }
-
-        return $array;
+        return $result;
 
     }
-    protected function countSendings(string $date, array $productsSummary, array $response)
+    protected function countSendings(string $date, int $sendingQuantity, array $response): array
     {
 
-        $begin = new \DateTime($this->startDateOfSending);
-        $end = new \DateTime($date);
+        $sth = $this->dbh->prepare("SELECT sum,quantity,name FROM `stock` LEFT JOIN `products` ON stock.product_id = products.id WHERE `product_id` = :product_id;");
+        $sth->execute(['product_id' => $response['product_id']]);
+        $stock = $sth->fetch(\PDO::FETCH_ASSOC);
 
-        $diff = $begin->diff($end)->days;
+        $price = round($stock['sum'] / $stock['quantity'], 2) * 100;
 
-        $sendingQuantityArray = self::fibonacci($diff);
-
-        $response['date'] = $date;
-
-        if (array_sum($sendingQuantityArray) > $productsSummary[2]['quantity']) {
-
-            $response['errors'][] = "Не хватает товара на складе для выбранной даты";
-
+        if ($sendingQuantity > $stock['quantity']) {
+            $date = new \DateTime($date);
+            $date = $date->modify('+1 day')->format('Y-m-d');
+            $response['name'] = 'Не хватает товара на складе для выбранной даты для оправки в магазин';
+            $response['price'] = '';
+            $response['quantity'] = '';
+            $response['date'] = $date;
+            $response['sum'] = '';
+            $response['remaining'] = '';
+            $response['status'] = false;
             return $response;
         }
 
-        $response['name'] = $productsSummary[2]['name'];
-        $response['quantity'] = $sendingQuantityArray[$diff - 1];
-        $response['price'] = round(($productsSummary[2]['sum'] / $productsSummary[2]['quantity'])
-            + ($productsSummary[2]['sum'] / $productsSummary[2]['quantity'] * 0.3), 2);
-        $response['sum'] = $response['price'] * $response['quantity'];
-        $response['remaining'] = $productsSummary[2]['quantity'] - array_sum($sendingQuantityArray);
+        $stmt = $this->dbh->prepare("INSERT INTO `sendings` SET `quantity` = :quantity ,`price`=:price,`sum` = :sum ,`date` = :date,`product_id`= :product_id;");
+
+        $stmt->execute(
+            array(
+                'quantity' => $sendingQuantity,
+                'sum' => $sendingQuantity * $price,
+                'date' => $date,
+                'price' => $price,
+                'product_id' => $response['product_id']
+            )
+        );
+        $date = new \DateTime($date);
+        $date = $date->modify('+1 day')->format('Y-m-d');
+
+        $response['price'] = $price / 100;
+        $response['name'] = $stock['name'];
+        $response['quantity'] = $sendingQuantity;
+        $response['date'] = $date;
+        $response['sum'] = $sendingQuantity * $price / 100;
+        $response['remaining'] = $stock['quantity'] - $sendingQuantity;
+        $response['status'] = true;
         return $response;
 
     }
-    public function countPriceOfProductForSending(string $date, array $response)
+    public function countPriceOfProductForSending(string $date, array $response): array
     {
 
         if (!strtotime($date)) {
@@ -96,12 +120,51 @@ class DB
 
             return $response;
         }
+        $this->dbh->exec("TRUNCATE `stock`");
+        $this->dbh->exec("TRUNCATE `sendings`");
 
-        $productsSummary = $this->countProducts($date, $response);
+        $beginDate = new \DateTime($this->startDateOfSending);
 
-        $response = $this->countSendings($date, $productsSummary, $response);
+        $endDate = new \DateTime($date);
 
-        return $response;
+        $dayDiff = $beginDate->diff($endDate)->days;
+
+        if ($dayDiff < 1) {
+
+            $response['errors'][] = 'Не верная дата';
+
+            return $response;
+        }
+
+        $sendingQuantityArray = self::fibonacci($dayDiff);
+
+        $result = [];
+
+        $sendingsOrder = 0;
+        for ($i = 0; $i < $dayDiff; $i++) {
+            $response = $this->countProducts($beginDate->format('Y-m-d'), $response);
+            if (isset($response['errors'])) {
+                return $response;
+            }
+
+            $response = $this->countSendings(
+                $beginDate->format('Y-m-d'),
+                $sendingQuantityArray[$sendingsOrder],
+                $response
+            );
+            if (isset($response['errors'])) {
+                return $response;
+            }
+            if ($response['status']) {
+                $sendingsOrder++;
+            }
+
+            $beginDate = $beginDate->modify('+1 day');
+
+            $result[] = $response;
+        }
+
+        return $result;
 
     }
 

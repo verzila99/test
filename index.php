@@ -33,18 +33,18 @@ require_once(__DIR__ . '/post.php');
 
 <body>
 
+
     <form action="index.php" method="post">
-        <input name="date" type="date" value="<?php echo $response['date'] ?? '' ?>" min="2021-01-14"
-            max="2021-03-01" />
+        <input name="date" type="date" value="<?php echo $response[count($response) - 1]['date'] ?? '' ?>"
+            min="2021-01-14" max="2021-03-01" />
         <button type="submit">Отправить</button>
-        <?php if (isset($response['errors'])): ?>
+        <?php if (isset($response['errors']) && is_array($response['errors'])): ?>
             <?php foreach ($response['errors'] as $key => $value): ?>
                 <p style="color:red"><?php echo $value ?></p>
             <?php endforeach; ?>
         <?php endif; ?>
 
     </form>
-
     <?php if (!isset($response['errors'])): ?>
 
         <table class="table">
@@ -56,14 +56,17 @@ require_once(__DIR__ . '/post.php');
                 <td>Сумма</td>
                 <td>Остаток</td>
             </tr>
-            <tr>
-                <td><?php echo $response['date'] ?></td>
-                <td><?php echo $response['name'] ?></td>
-                <td><?php echo $response['price'] ?></td>
-                <td><?php echo $response['quantity'] ?></td>
-                <td><?php echo $response['sum'] ?></td>
-                <td><?php echo $response['remaining'] ?></td>
-            </tr>
+            <?php foreach ($response as $item): ?>
+                <tr>
+                    <td><?php echo $item['date'] ?></td>
+                    <td><?php echo $item['name'] ?></td>
+                    <td><?php echo $item['price'] ?></td>
+                    <td><?php echo $item['quantity'] ?></td>
+                    <td><?php echo $item['sum'] ?></td>
+                    <td><?php echo $item['remaining'] ?></td>
+
+                </tr>
+            <?php endforeach; ?>
 
         </table>
 

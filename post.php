@@ -2,7 +2,7 @@
 require_once(__DIR__ . '/db.php');
 use app\DB;
 
-$response = [];
+$response['product_id'] = 3;
 
 if (!isset($_REQUEST['date'])) {
     $response['errors'][] = 'Поле дата не должно быть пустым';
