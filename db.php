@@ -14,7 +14,6 @@ class DB
             die($e->getMessage());
         }
 
-
     }
     protected static function fibonacci(int $maxLevel, int $currentLevel = 1, $result = [1]): array
     {
@@ -37,7 +36,7 @@ class DB
         return self::fibonacci($maxLevel, $currentLevel, $result);
 
     }
-    public function countProducts(string $date, array $response): array
+    public function updatingStockFromDeliveries(string $date, array $response): array
     {
 
         $sth = $this->dbh->prepare("SELECT * FROM `deliveries` WHERE `date` = :date AND `product_id`=:product_id;");
@@ -143,7 +142,7 @@ class DB
 
         $sendingsOrder = 0;
         for ($i = 0; $i < $dayDiff; $i++) {
-            $response = $this->countProducts($beginDate->format('Y-m-d'), $response);
+            $response = $this->updatingStockFromDeliveries($beginDate->format('Y-m-d'), $response);
             if (isset($response['errors'])) {
                 return $response;
             }
